@@ -411,10 +411,7 @@ def sigmoid_based_loss(x: torch.Tensor,
                        logit_scale: torch.Tensor,
                        bias: torch.Tensor) -> torch.Tensor:
     B = x.size(0)
-    x_norm = F.normalize(x, p=2, dim=1)
-    y_norm = F.normalize(y, p=2, dim=1)
-    t = logit_scale.exp()
-    logits = x_norm @ y_norm.T * t + bias
+    logits = x @ y.T * logit_scale + bias
     labels = 2 * torch.eye(B, device=logits.device) - torch.ones((B, B), device=logits.device)
     return -torch.sum(F.logsigmoid(labels*logits))/B
 
@@ -580,6 +577,8 @@ class CTCLIP(nn.Module):
         # temperature
 
         self.temperature = nn.Parameter(torch.tensor(1.))
+
+        self.bias = nn.Parameter(torch.zeros(1)) # bias for sigmoid based loss function
 
         # from https://arxiv.org/abs/2111.07783 (FILIP paper)
         self.use_all_token_embeds = use_all_token_embeds
@@ -842,6 +841,7 @@ class CTCLIP(nn.Module):
         loss = sigmoid_based_loss(
             x=text_latents.view(-1, text_latents.shape[-1]),
             y=image_latents.view(-1, image_latents.shape[-1]),
-            logit_scale=self.temperature,
+            logit_scale=temp,
             bias=self.bias)
+        
         return loss
